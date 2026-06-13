@@ -1,0 +1,94 @@
+name: bump-chime
+
+on:
+  schedule:
+    - cron: "0 7 * * *"   # daily, 07:00 UTC
+  workflow_dispatch:        # run on demand from the Actions tab
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  bump:
+    name: Check PyPI and open bump PR
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Detect new chime-cli release
+        id: detect
+        shell: bash
+        run: |
+          python3 <<'PY'
+          import json, os, re, sys, urllib.request
+
+          formula = open("Formula/chime.rb").read()
+          m = re.search(r"chime_cli-([0-9.]+)\.tar\.gz", formula)
+          if not m:
+              sys.exit("Could not parse current version from formula")
+          current = m.group(1)
+
+          with urllib.request.urlopen("https://pypi.org/pypi/chime-cli/json", timeout=20) as r:
+              data = json.load(r)
+          latest = data["info"]["version"]
+
+          def out(key, value):
+              with open(os.environ["GITHUB_OUTPUT"], "a") as f:
+                  f.write(f"{key}={value}\n")
+
+          out("current_version", current)
+          out("latest_version", latest)
+          if latest == current:
+              print(f"Formula already at {current}; nothing to do.")
+              out("changed", "false")
+              sys.exit(0)
+
+          files = data["releases"][latest]
+          sdist = next((f for f in files if f["packagetype"] == "sdist"), None)
+          if sdist is None:
+              sys.exit(f"No sdist found for chime-cli {latest}")
+          new_url = sdist["url"]
+          new_sha = sdist["digests"]["sha256"]
+
+          formula = re.sub(r'url\s+".*"', f'url "{new_url}"', formula, count=1)
+          formula = re.sub(r'sha256\s+".*"', f'sha256 "{new_sha}"', formula, count=1)
+          with open("Formula/chime.rb", "w") as f:
+              f.write(formula)
+
+          out("changed", "true")
+          out("new_url", new_url)
+          out("new_sha", new_sha)
+          print(f"Bumped {current} -> {latest}")
+          PY
+
+      - name: Validate formula installs and passes its test
+        if: steps.detect.outputs.changed == 'true'
+        run: |
+          brew install --build-from-source ./Formula/chime.rb
+          brew test chime
+
+      - name: Open PR and enable auto-merge
+        if: steps.detect.outputs.changed == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          NEW: ${{ steps.detect.outputs.latest_version }}
+          OLD: ${{ steps.detect.outputs.current_version }}
+        run: |
+          BRANCH="bump-chime-$NEW"
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git checkout -b "$BRANCH"
+          git add Formula/chime.rb
+          git commit -m "chime $NEW"
+          git push origin "$BRANCH"
+          gh pr create \
+            --title "chime $NEW" \
+            --body "Automated bump from PyPI: $OLD → $NEW. Built and tested in this run." \
+            --head "$BRANCH" \
+            --base main
+          # --auto needs branch protection to actually wait for checks; without
+          # protection it merges immediately, which is fine since this workflow
+          # already validated the install/test.
+          gh pr merge "$BRANCH" --auto --squash --delete-branch \
+            || gh pr merge "$BRANCH" --squash --delete-branch
