@@ -3,8 +3,8 @@ class Chime < Formula
 
   desc "Friendly terminal alarms, timers & pomodoro"
   homepage "https://github.com/MaVericKWareZ/chime"
-  url "https://files.pythonhosted.org/packages/57/e2/a88e672f758ea15fa78c1281e9ae6a591fbee49172abb23cd253d13be50b/chime_cli-0.1.0.tar.gz"
-  sha256 "6f24cd0a23b0890b97d3a7caf20829184bea4927683e5ca43fb79428e4d3e198"
+  url "https://files.pythonhosted.org/packages/22/be/260584190887caf8f43076f519b52cc65c4ce9c141f6bc459f3da91f4057/chime_cli-0.3.0.tar.gz"
+  sha256 "6f3626b04dcb86be3b7783d6345a06aca7203231bf9ca50ad18f5731bc2093ff"
   license "MIT"
   head "https://github.com/MaVericKWareZ/chime.git", branch: "main"
 
