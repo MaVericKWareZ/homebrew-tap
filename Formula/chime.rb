@@ -15,7 +15,7 @@ class Chime < Formula
   end
 
   test do
-    assert_match "chime 0.1.0", shell_output("#{bin}/chime version")
+    assert_match "chime #{version}", shell_output("#{bin}/chime version")
     assert_match "Usage:", shell_output("#{bin}/chime help")
   end
 end
