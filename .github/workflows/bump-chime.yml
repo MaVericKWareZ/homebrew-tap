@@ -65,8 +65,15 @@ jobs:
       - name: Validate formula installs and passes its test
         if: steps.detect.outputs.changed == 'true'
         run: |
-          brew install --build-from-source ./Formula/chime.rb
-          brew test chime
+          # Homebrew refuses to install a formula by path unless it belongs to a
+          # tap. Symlink this checked-out repo into the Taps dir as its tap
+          # (maverickwarez/tap) so the just-bumped Formula/chime.rb is validated
+          # in place, then install/test by the tap-qualified name.
+          tap_dir="$(brew --repository)/Library/Taps/maverickwarez/homebrew-tap"
+          mkdir -p "$(dirname "$tap_dir")"
+          ln -sfn "$GITHUB_WORKSPACE" "$tap_dir"
+          brew install --build-from-source maverickwarez/tap/chime
+          brew test maverickwarez/tap/chime
 
       - name: Open PR and enable auto-merge
         if: steps.detect.outputs.changed == 'true'
